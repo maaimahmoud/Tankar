@@ -82,6 +82,10 @@ include tanker.inc
     60Cos DB 60,59,56,52,46,39,30,21,10,0 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     
+    ;;;;;; Projectile Parameters ;;;;;;
+    SavedPixels DW 9 dup (0)
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     
     ;;;;;; Gun Parameters ;;;;;; 
     angle DW 5,5    ;angle between gun and horizontal
@@ -143,7 +147,8 @@ main proc FAR
     mov ax,@Data
     mov ds,ax
        
-    CALL CHANGE_MODE
+    CALL CHANGE_MODE 
+    ;Call DRAW_CLOUDS
     ;READ PLAYER NAMES FROM USER
     call ASK_P1 
     call ASK_P2  
@@ -765,7 +770,10 @@ MainBar PROC
     ;Print Player2 Name in new cursor position
     mov ah, 9
     mov dx, offset P2Name[2]
-    int 21h
+    int 21h  
+    
+    ;UPDATE REEM
+    CALL DRAW_CLOUDS
       
     ret
 MainBar endp 
@@ -1608,19 +1616,110 @@ DRAWPROJ PROC
     PUSH BX  ; push index (VAL OF T)                    
     PUSH AX  ; PUSH BACKGROUND COLOR
     
-    ;DRAW PROJECTILE IN WHITE
+    ;Mai: Draw Projectile
+    
+    dec Dx 
+    mov Bx,offset SavedPixels
+    
+    Push si
+    push di
+    
+    mov si,2
+    DrawBigProjectile:  
+    MOV AH, 0DH
+    INT 10H
+    
+    mov [Bx],Al
+    inc bx
+    
+    ;DRAW PROJECTILE IN ITS COLOR
+    MOV AH, 0CH 
+    MOV AL, 130
+    INT 10H  
+    
+    add dx,2
+    dec si
+    JNZ  DrawBigProjectile 
+    
+    
+    sub dx,3
+    dec cx
+     
+    mov di,3
+                        
+    DrawBigProjectileHorizontal:  
+    
+    MOV AH, 0DH
+    INT 10H
+    mov [Bx],Al
+    inc bx
+    
+    ;DRAW PROJECTILE IN ITS COLOR
     MOV AH, 0CH 
     MOV AL, 130
     INT 10H
+    
+    inc cx
+    
+    dec di
+    JNZ  DrawBigProjectileHorizontal
+
+    pop si
+    pop di 
+    sub cx,2
+    
     
     ;ACTIVATE PAUSE FOR DOSBOX
     CALL PAUSE  
     
     POP AX   ; POP BACKGROUND COLOR
     
-    ;REMOVE PROJECTILE
-    MOV AH, 0CH  
-    INT 10H 
+    ;Mai: Remove Projectile
+    
+    dec Dx 
+    mov Bx,offset SavedPixels
+    
+    Push si
+    push di
+    
+    mov si,2
+    RemoveBigProjectile:
+      
+    mov Al,[Bx]
+    inc bx
+    
+    ;DRAW PROJECTILE IN ITS COLOR
+    MOV AH, 0CH 
+    ;MOV AL, 130
+    INT 10H  
+    
+    add dx,2
+    dec si
+    JNZ  RemoveBigProjectile
+    sub dx,3
+    dec cx
+     
+    mov di,3
+                        
+    RemoveBigProjectileHorizontal:  
+    
+    mov Al,[Bx]
+    inc bx
+    
+    ;DRAW PROJECTILE IN ITS COLOR
+    MOV AH, 0CH 
+    ;MOV AL, 130
+    INT 10H
+    
+    inc cx
+    
+    dec di
+    JNZ  RemoveBigProjectileHorizontal
+
+    pop si
+    pop di
+    dec cx
+ 
 
     pop bx  ; pop index
 
@@ -1720,4 +1819,31 @@ DISPLAY_SOUND PROC
         
 POPA   
     RET 
-DISPLAY_SOUND ENDP
+DISPLAY_SOUND ENDP     
+
+
+
+
+DRAW_CLOUDS PROC 
+  
+  PUSHA
+  MOV X1,20
+  Mov Y1,50 
+  PUSH X1
+  PUSH Y1
+  MOV DRAWINGCOLOR,1  
+  mov r,5  
+   PUSH R
+ ; MOV L1,30
+  CALL Drawlcircle
+  POP R 
+  
+  POP Y1
+  POP X1
+  CALL Drawucircle     
+    
+    
+  POPA  
+    RET 
+DRAW_CLOUDS ENDP    
+    
