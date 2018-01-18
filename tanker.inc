@@ -1,22 +1,88 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 TAKE_INP MACRO P   ;PLAYER 1: P=0.....PLAYER 2: P=2 
     
-    local loa,checkup,checkdown ,checkright,checkleft,checkhit,final,SpeedAboveFourty,AfterSelectSpeed,SpeedAboveFiFty,END,CHECKSPEEDDOWN,CHECKSPEEDUP,CHECK_EXIT
+    local DONOTDRAWCLOUDS ,sendah,chats,LOll,RL,PRINTNULLL,AGAINPPL,CHECKINPL,CHKPPL,loa,checkup,checkdown ,checkright,checkleft,checkhit,final,SpeedAboveFourty,AfterSelectSpeed,SpeedAboveFiFty,END,CHECKSPEEDDOWN,CHECKSPEEDUP,CHECK_EXIT
     
-    MOV CurrentPlayer, P
-    ; this is used as if player  press by wrong button (during projectile movement)
-    ;EMPTY THE BUFFER 
-    MOV AL,0 
-    mov ah,0Ch              
-    int 21h
-  
-LOA:
-    ;
-    ;
-    ;GET INPUT KEY 
-    MOV AH, 00 
+   MOV CurrentPlayer, P 
+    
+loa:    
+     
+    cmp LevelNumber,2
+    JNE DONOTDRAWCLOUDS 
+    CALL MOV_CLOUDS
+    DONOTDRAWCLOUDS:
+     MOV AH, 01 ; ZF =0 if key pressed, else ZF=1
+    INT 16H  
+    JZ PRINTNULLL
+    
+    MOV AH, 00 ; AL: ASCII Code, AH: Scancode
     INT 16H 
+    
+    JMP RL
+    PRINTNULLL:
+    MOV AX,0   
+    RL: 
+    PUSH AX
+    
+    
+     
+
+           
+    mov dx , 3FDH		; Line Status Register
+    AGAINPPL: 
+    In al , dx 			;Read Line Status
+    AND al , 00100000b
+    JZ AGAINPPL 
+
+     
+    mov dx , 3F8H
+    POP AX	 
+    cmp AL,0
+    je sendah
+    mov ah,al 
+    sendah:
+	MOV MYINP, AH
+    MOV AL,AH	; Transmit data registe   
+    MOV CX,AX
+    out dx , al  
+    
+    cmp al, 27
+    je esc3
+      
+        
+   CHECKINPL:  
+     mov dx , 3FDH		; Line Status Register
+   CHKPPL: in al , dx 
+        AND al , 1
+        JZ CHKPPL
+    
+        
+    mov dx , 03F8H
+    in al , dx   
+    cmp al, 27
+    je esc3
+    MOV AH,AL ;HAVEE IN AH THE USER KEY 
+	MOV USERINP,AH
+
+      MOV DX,0
+     MOV DL, MYNUM
+    CMP CURRENTPLAYER, DX
+    JNE LOll
+    
+    MOV AX,CX  
+    
+ 
+    
+ 
+    
+ 
+    
+  
+LOll:
     ;
+    cmp aH,0 
+    call innerchat  
+    je loa
     ;
     ;CHECK FOR UP KEY TO INCREMENT GUN ANGLE
     CHECKUP: 
@@ -117,15 +183,144 @@ LOA:
     ADD SI,AX
     ADD DI,AX
     CALL DRAWPROJ
-    
-    JMP END  
+    JMP END 
     CHECK_EXIT:
-    CMP AL,27
-    JNE LOA
-    MOV MODE,3  
+    CMP AH,1
+    JNE CHATS
+    MOV MODE,3 
+	JMP END 
+   chats:
     
+	JMP LOA
 END:
 TAKE_INP ENDM  
+;TAKE_INP MACRO P   ;PLAYER 1: P=0.....PLAYER 2: P=2 
+;    
+;    local loa,checkup,checkdown ,checkright,checkleft,checkhit,final,SpeedAboveFourty,AfterSelectSpeed,SpeedAboveFiFty,END,CHECKSPEEDDOWN,CHECKSPEEDUP,CHECK_EXIT
+;    
+;    MOV CurrentPlayer, P
+;    ; this is used as if player  press by wrong button (during projectile movement)
+;    ;EMPTY THE BUFFER 
+;    MOV AL,0 
+;    mov ah,0Ch              
+;    int 21h
+;  
+;LOA:
+;    ;
+;    ;
+;    ;GET INPUT KEY 
+;    MOV AH, 00 
+;    INT 16H 
+;    ;
+;    ;
+;    ;CHECK FOR UP KEY TO INCREMENT GUN ANGLE
+;    CHECKUP: 
+;    CMP AH,UP+P
+;    JNE CHECKDOWN 
+;    ;STOP WHEN ANGLE = MAX= 90
+;    CMP ANGLE+P,9 
+;    JE LOA 
+;    ;REMOVE OLD GUN
+;    MOV BL,BackgroundColor
+;    mov DrawingColor, BL
+;    DrawGun P 
+;    INC ANGLE+P  
+;    ;DRAW GUN IN NEW POSITION
+;    MOV BL,Color1
+;    mov DrawingColor, BL
+;    DrawGun P 
+;    JMP LOA  
+;    ;
+;    ;
+;    ;CHECK FOR DOWN KEY TO DECREMENT GUN ANGLE
+;    CHECKDOWN:
+;    CMP AH,DOWN+P
+;    JNE CHECKRIGHT
+;    ;STOP WHEN ANGLE = MIN= 0
+;    CMP ANGLE+P,0 
+;    JE LOA
+;    ;REMOVE OLD GUN 
+;    MOV BL, BackgroundColor
+;    mov DrawingColor, BL
+;    DrawGun P 
+;    DEC ANGLE+P 
+;    ;DRAW GUN IN NEW POSITION
+;    MOV BL,  Color1
+;    mov DrawingColor, BL
+;    DrawGun P
+;    JMP LOA
+;    ;
+;    ;
+;    ;CHECK FOR RIGHT KEY TO MOVE TANK RIGHT
+;    CHECKRIGHT:
+;    CMP AH,RIGHT+P
+;    JNE CHECKLEFT
+;    call movetank
+;    JMP LOA
+;    ;
+;    ;
+;    ;CHECK FOR LEFT KEY TO MOVE TANK LEFT  
+;    CHECKLEFT:
+;    CMP AH, LEFT+P
+;    JNE CHECKSPEEDUP
+;    call movetank
+;    JMP LOA 
+;    ;
+;    ;
+;    ;CHECK FOR U KEY TO INCREASE SPEED OF PROJECTION
+;    CHECKSPEEDUP:
+;    CMP AH,SPEEDUP+P
+;    JNE CHECKSPEEDDOWN
+;    CALL INCREMENTSPEED
+;    JMP LOA
+;    ;
+;    ;
+;    ;CHECK FOR Y KEY TO DECREASE SPEED OF PROJECTION
+;    CHECKSPEEDDOWN:
+;    CMP AH,SPEEDDOWN+P
+;    JNE CHECKHIT
+;    CALL DECREMENTSPEED
+;    JMP LOA  
+;    ;
+;    ;
+;    ;CHECK FOR SPACE KEY FOR PLAYER TO HIT
+;    CHECKHIT:
+;    CMP Ah,HIT+P
+;    jne CHECK_EXIT
+;    ;GET STARTING POINT OF PROJECTION
+;    MOV BX,GX1+P 
+;    MOV DX,200  
+;    SUB DX, GY1+P
+;    ;DECIDE ON PROJECTION SPEED V TO CHOOSE VCOS(THETA)/VSIN(THETA) 
+;    cmp CurrentSpeed,40
+;    JNE SpeedAboveFourty
+;    MOV SI,OFFSET 40Cos 
+;    MOV DI,OFFSET 40Sin
+;    jmp AfterSelectSpeed
+;    SpeedAboveFourty:
+;    cmp CurrentSpeed,50
+;    JNE SpeedAboveFiFty
+;    MOV SI,OFFSET 50Cos 
+;    MOV DI,OFFSET 50Sin
+;    jmp AfterSelectSpeed
+;    SpeedAboveFiFty:       
+;    MOV SI,OFFSET 60Cos 
+;    MOV DI,OFFSET 60Sin
+;    AfterSelectSpeed: 
+;    ;CHOOSE CORRECT THETA
+;    MOV AX,ANGLE+P
+;    ADD SI,AX
+;    ADD DI,AX
+;    CALL DRAWPROJ
+;    
+;    JMP END  
+;    CHECK_EXIT:
+;    CMP AL,27
+;    JNE LOA
+;    MOV MODE,3  
+;    
+;END:
+;TAKE_INP ENDM  
     
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
 DRAW_QUAD MACRO  LENGTH,XSTART,YSTART,WIDTH,COLOR
@@ -358,7 +553,8 @@ TANKHIT ENDM
 CALCDAMAGE MACRO P 
     ;r^2=y^2+x^2   
     
-    LOCAL NODAM,YOOH,YOOH1,YOOH3,YOOH4
+    LOCAL NODAM,YOOH,YOOH1,YOOH3,YOOH4 ,START_AGAINE,  AGAINPPL ,COMP11 ,CHKPPL,CHECKINPL
+
     
     PUSH DX     ;WHICH HAS Y
     sub cx,x0+P ;X-CENTER OF TANK
@@ -536,23 +732,145 @@ MOV DX, OFFSET INSTRUCTION9
 INT 21H    
          
         
-INPUT3:
-    MOV AH,00
-    INT 16H
+
+
+START_AGAINE:  
+; MOV AH, 01 ; ZF =0 if key pressed, else ZF=1
+;    INT 16H  
+;    JZ PRINTNULLLe
+;    
+;    MOV AH, 00 ; AL: ASCII Code, AH: Scancode
+;    INT 16H 
+;    
+;    JMP RLe
+;    PRINTNULLLe:
+;    MOV AL,0
+;    RLe: 
+
+   
+     MOV AH, 01 ; ZF =0 if key pressed, else ZF=1
+    INT 16H  
+    JZ PRINTNULLL
     
-    cmp al,13
-    je endi 
+    MOV AH, 00 ; AL: ASCII Code, AH: Scancode
+    INT 16H 
     
-    CMP AL,27
-    JE ESC3
-    jmp input3
+    JMP RL
+    PRINTNULLL:
+    MOV AX,0   
+    RL: 
+    PUSH AX
     
+     
+
+           
+    mov dx , 3FDH		; Line Status Register
+    AGAINPPL: 
+    In al , dx 			;Read Line Status
+    AND al , 00100000b
+    JZ AGAINPPL 
+
+     
+    mov dx , 3F8H
+    POP AX	; Transmit data register
+    out dx , al 
+    CMP AL, 13
+    JNE COMP11 
+    CMP REEM,1
+    JE ENDI
+    MOV REEM,1 
+    COMP11:    
+   CHECKINPL:  
+     mov dx , 3FDH		; Line Status Register
+   CHKPPL: in al , dx 
+        AND al , 1
+        JZ CHKPPL
+    mov dx , 03F8H
+    in al , dx  
+    CMP AL,13
+    JNE START_AGAINE
+    CMP REEM,1
+    JE ENDI
+    MOV REEM,1
+    JMP START_AGAINE 
+       
 ESC3: 
    MOV MODE,3
+  JMP ENDIT
+endi:  
  
- endi:
+ CMP MYNUM,0
+ JNE LOADINNG 
+  DELETE_SCREEN 0,25
+  CALL SELECTLEVEL
+ LOADINNG: 
+ CMP MYNUM,0
+ JNE RECIEVEL 
+ mov dx , 3FDH		; Line Status Register
+    AGAINPPPL: 
+    In al , dx 			;Read Line Status
+    AND al , 00100000b
+    JZ AGAINPPPL 
+
+     
+    mov dx , 3F8H
+    MOV AL,LevelNumber	; Transmit data register
+    out dx , al  
+    JMP ENDIT
+ RECIEVEL:  
+     mov dx , 3FDH		; Line Status Register
+   CHKPPPL: in al , dx 
+        AND al , 1
+        JZ CHKPPPL
+    mov dx , 03F8H
+    in al , dx  
+    
+    CMP AL, 0
+    JE RECIEVEL 
+    MOV LevelNumber,AL
+ENDIT:   
 pop w
 pop l1      
     
 GAMEINSTRUCTION ENDM 
 
+MACRO DELETE_SCREEN T,O  
+    PUSHA
+     ; MOVE CURSOR TO SPECIFIC POSITION
+    MOV AH, 7
+    MOV Cl, 0
+    mov ch, t; X coordinate
+    MOV Dl, 80
+    mov dh, O  ; Y coordinate 
+    MOV BH, 00  ; If Mode supports more than 1 page, else it is ignored
+    MOV AL, 0  ;    Pixel Color
+    int 10h    
+
+    POPA
+ 
+ DELETE_SCREEN ENDM                 
+
+
+
+MACRO DELETE_LINE  T1 
+    LOCAL S
+    PUSHA
+    MOV AH, 0CH
+    MOV CL,0 ; X coordinate
+    MOV CH,T1
+    MOV DL,0  ; Y coordinate
+    MOV DH,T1 
+    MOV BH, 00  ; If Mode supports more than 1 page, else it is ignored
+    MOV AL, 0  ; 
+        
+    S:
+    
+    INT 10H
+    INC CX
+    
+    CMP CX,320
+    JNZ S  
+    
+    POPA
+ 
+ DELETE_LINE ENDM                 

@@ -1,4 +1,4 @@
-include tanker.inc
+    include tanker.inc
 ;;;;;;;;;;;;;;;;;;;;;;; GAME CONTROLS;;;;;;;;;;;;;;;;;;;;;;;
   ;* EACH PLAYER HAVE THE SAME CONTROLLS IN HIS TURN 
     ;  * RIGHT ARROW TO MOVE RIGHT 
@@ -16,18 +16,18 @@ include tanker.inc
     ;;;;;; GAME INFO ;;;;;;
     GameName DB 'TANKAR$'
     Level DB 'LEVEL ?$'
-    LevelNumber DB 1
+    LevelNumber DB 0
     ENDINGMESSAGE DB 'GAME OVER$'
     WINNERPLAYER DB ' WINS$'
     CurrentPlayer Dw 0
     MODE DB 0
     ;;;;;;;;;;;;;;;;;;;;;;
-    
+
     ;;;;;; Players info ;;;;;;
-    P1NAME  DB 16,?,17 dup('$')  
-    P2NAME  DB 16,?,17 dup('$') 
-    EMPTYSTR DB 17 DUP<'$'>
-    A_P DB "Name of Player 1: $" 
+    P1NAME  DB 17,?,16 DUP('$')  
+    P2NAME  DB 17,?,16 DUP('$')
+    EMPTYSTR DB 17 DUP('$')
+    A_P DB "Enter player Name : $" 
     PlayersHealth DB 80,80  
     ;;;;;;;;;;;;;;;;;;;;;;;;;
     
@@ -62,7 +62,17 @@ include tanker.inc
     MountainLenght DW 166
     MountainWidth DW  50
     MountainColor db 211
-    ;;;;;;;;;;;;;;;;;;;;;; 
+    ;;;;;;;;;;;;;;;;;;;;;;   
+    
+    ;;;;;; CLOUDS ;;;;;;;
+    CLX1 DW 20
+    CLY DW 70 
+	CLX2 DW 250
+    MOVEDIRECTION2 DW 1  ;0 FOR MOVING RIGHT,1 FOR LEFT 
+    MOVEDIRECTION1 DW 0  ;0 FOR MOVING RIGHT,1 FOR LEFT   
+    MOVEDELAY DW 10
+    MOVEDELAYTIME EQU 10
+    ;;;;;;;;;;;;;;;;;;;;
     
     HunSin DB 0,17,34,50,64,77,87,94,98,100   ;v=100
     HunCos DB 100,98,94,87,77,64,50,34,17,0 
@@ -113,9 +123,9 @@ include tanker.inc
     RIGHT DB 77,0,77
     UP DB  72,0,72  
     DOWN DB 80,0,80   
-    HIT DB 57,0, 57  
-    SPEEDUP DB 78,0,78 
-    SPEEDDOWN DB 74,0,74
+    HIT DB 13,0, 13  
+    SPEEDUP DB '+',0,'+' 
+    SPEEDDOWN DB '-',0,'-'
     
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
     ;;;;;;;;; dimensions of screen;;;;;;;;;
@@ -126,7 +136,7 @@ include tanker.inc
     ESCMESSAGE DB " TO EXIT PRESS ESC $"
     F2MESSAGE DB " TO START TANKER GAME PRESS F2 $"
     F1MESSAGE DB " TO START CHATTING PRESS F1 $"
-    RESTARTMESSAGE DB "TO RESTART PRESS R $ " 
+    RESTARTMESSAGE DB "TO RETURN TO MENUE PRESS R $ " 
     ERROR DB 'Invalid. First Letter must be a Letter. Press ENTER$'
     INSTRUCTION DB  "GAME INSTUCTION CONTROLLS $"
     INSTRUCTION1 DB "PLAYERS EXCHANGE TURNS WITH CONTROLLS $"
@@ -137,42 +147,87 @@ include tanker.inc
     INSTRUCTION6 DB "UP ARROW TO INCREASE ANGLE $"
     INSTRUCTION7 DB "DOWN ARROW TO DECREASE ANGLE $"
     
-    INSTRUCTION8 DB "SPACE BUTTON TO FIRE  $"
+    INSTRUCTION8 DB "ENTER BUTTON TO FIRE  $"
     INSTRUCTION9 DB "PRESS ENTER TO START GAME  $"
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     
+     
+    F3MESSAGE DB " TO EXIT CHAT PRESS F3 $"
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ 
+ 
+CONNECTIONERROR DB "CONNECTION DROPPED$" 
+MYNUM DB 6 ;DEFINES THE PLAYER NUM ON THIS COMP 
+OTHNUM DB 0  
+CF1 DB 59
+CF2 DB 60 
+CESC DB 1  
+PF1 DB 0 
+INV DB " YOU SENT A GAME INVITATION TO $"
+RINV DB " SENT YOU A GAME INVITATION , PRESS F2 TO ACCEPT$"
+INV1 DB " YOU SENT A CHAT INVITATION TO $"
+RINV1 DB " SENT YOU A CHAT INVITATION , PRESS F1 TO ACCEPT$" 
+
+START DB "GAME STARTING$"
+REEM DB 0  
+;;;;;;;;;;;;;;;;;;;;;;CHATTING PARFAMETERS ;;;;;;;;;;;;;;;;;;;;;;;;;;;
+XPOS DB  0
+YPOS DB  1
+XRPOS DB 0
+YRPOS DB 13 
+;reset after chat   
+myx db 2
+myy db 21
+ux db 2
+uy db 20
+load DB " LOADING...... $" 
+MYINP DB 0
+USERINP DB 0  
 .Code
 
 main proc FAR
     mov ax,@Data
-    mov ds,ax
-       
-    CALL CHANGE_MODE 
+    mov ds,ax   
+    
+    CALL CONFIGURE
+   CALL CHANGE_MODE
+   CALL CONNECTION_CHECK
+    ;CALL CHANGE_MODE 
     ;Call DRAW_CLOUDS
     ;READ PLAYER NAMES FROM USER
-    call ASK_P1 
-    call ASK_P2  
+    call ASK_P 
+    DELETE_SCREEN 0,25
+     MOV AH,9H
+     MOV DX,OFFSET load
+     INT 21H 
+    CALL SENDNAME 
+    MAINMEN: 
+    DELETE_SCREEN 0,25
+   ; call ASK_P2  
     CALL DRAW_STATUS_BAR
-    ;CHECK USER MODE 
+    ;CHECK USER MODE
+    
     CALL DETECTING_USER_CHOISE
     ;DETECTING MODE
     CMP MODE,1
-       ; JE CHATTING
+        JE CHATTING
     CMP MODE,2
         JE GAMEINST
     CMP MODE,3
         JE ESC 
     ;PREPARE SCENE TO START PLAYING 
     GAMEINST:
-       GAMEINSTRUCTION
+      GAMEINSTRUCTION   
         CMP MODE,3
             JE ESC   
+            
+            
     GAME:
      CALL GAMESTARTUP 
     
     ;;;;;;;;;;;;;;;;;;;;;;; starting logic;;;;;;;;;;;;;;;;;;;;
     ;Main Loop of the game until one of the players is dead
-        GameLabel:
+        GameLabel: 
+        
             ;TAKE USER INPUT FOR TANKS 
             TAKE_INP 0
             ; CHECK IF USER CHOOSE EXIT MODE 
@@ -214,14 +269,16 @@ main proc FAR
             call PRINTWINNER
             jmp ENDGAME
        ;chatting mode
-       ; CHATTING:
-       ;     JMP CHATTING
+        CHATTING:
+            DELETE_SCREEN 0,25
+            CALL CHAT
+            JMP MAINMEN
             
         ; CHECK IF UESR WANT TO END GAME OR RESTART IT
         ENDGAME:
           CALL DETECT_CHOISE
           CMP MODE,2
-          JE GAME 
+          JE MAINMEN
           ; esc mode
          ESC: 
            MOV AH,4CH
@@ -246,23 +303,27 @@ DRAW_STATUS_BAR PROC
     PUSH L1
     ; SET POSITION TO DRAW BELLOW LINE
     MOV X1,5
-    MOV Y1,189 
+    MOV Y1,181 
     MOV L1,300
     MOV DRAWINGCOLOR,0DH      
     CALL DRAWHLINE 
     ; SET CURSOR POSTION TO DISPLAY MESSAGE 
     
     mov CursorPositionX,1
-    mov CursorPositionY,24
+    mov CursorPositionY,23
     
     Call MoveCursor
     
-     
+
     ; DIPLAYING ESCAPE MESSAGE
     MOV AH ,9H
     MOV DX,OFFSET ESCMESSAGE
     INT 21H
-    POP L1
+    POP L1  
+    
+
+    
+    
     RET
 DRAW_STATUS_BAR ENDP   
  
@@ -300,8 +361,8 @@ RESTART ENDP
 ; PROSEDURE called to check user enter for ending game or restart it 
 DETECT_CHOISE PROC 
  
-    mov CursorPositionX,20
-    mov CursorPositionY,24
+    mov CursorPositionX,0
+    mov CursorPositionY,23
     
     Call MoveCursor
      
@@ -315,7 +376,7 @@ INPUT2:
     mov ah,00
     int 16h
     
-    cmp ah,13h  ;r to retart game again
+    cmp ah,13h  ;r to RETURN game again
     je game2
         
      cmp al,27  ;esc to esc game and end it
@@ -327,7 +388,7 @@ INPUT2:
         JMP restartt
     ESC2:
         MOV MODE,3
-    JMP ENDDDD
+        JMP ENDDDD
     RESTARTT:
         CALL RESTART
     ENDDDD:        
@@ -377,16 +438,15 @@ DETECTING_USER_CHOISE PROC
     MOV DX,OFFSET ESCMESSAGE
     INT 21H
  INPUT: 
-    MOV AH,00
-    INT 16H
+    CALL MANAGER
     
     CMP AL,27
     JE END_GAME
     
-    CMP AH,59
-    ;JE CHATTING_MODE
+    CMP AH,CF1
+    JE CHATTING_MODE
     
-    CMP AH,60
+    CMP AH,CF2
     JE START_GAME
     
    JMP INPUT   ; THIS MEANS THAT USER PRESS WRONG BUTTON 
@@ -447,7 +507,32 @@ GAMESTARTUP PROC
     ;DRAW THE MOUNTAIN BETWEEN THE TWO TANKS                             
     DRAW_QUAD MountainLenght,MountainCenterX,MountainCenterY,MountainWidth,MountainColor    
     ;Prepare game for Player1 to play
-    call changeplayers
+    call changeplayers 
+    MOV CURSORPOSITIONX,0
+    MOV CURSORPOSITIONY,20
+    CALL MOVECURSOR 
+    
+    MOV AH,2
+    MOV Dl,P2NAME[2]
+    INT 21H 
+    
+       
+    MOV AH,2
+    MOV DX,':'
+    INT 21H 
+    
+    
+     MOV CURSORPOSITIONX,0
+    MOV CURSORPOSITIONY,21
+    CALL MOVECURSOR 
+    
+    MOV AH,2
+    MOV Dl,P1NAME[2]
+    INT 21H 
+    
+     MOV AH,2
+    MOV DX,':'
+    INT 21H 
      
     RET
 GAMESTARTUP ENDP
@@ -470,8 +555,12 @@ PRINTWINNER PROC
     mov CursorPositionX,20
     mov CursorPositionY,9
     
+    CMP MYNUM,0
+    JNE T
+     
     cmp PlayersHealth,0
     JNE CheckifPlayer2dead
+    
     ;Print Player2 name as a winner if player1health = 0
     ;compute suitble x so the winner statment is centered
     add al,P2Name[1] ;al=lenght of statment (winner playername + 'Wins')
@@ -499,8 +588,42 @@ PRINTWINNER PROC
     mov ah, 9
     mov dx, offset P1Name[2]
     int 21h
+    JMP PRINTWINS
+    T:    
+    
+      
+    cmp PlayersHealth,0
+    JNE CheckifPlayer2dead1
+    
+    ;Print Player2 name as a winner if player1health = 0
+    ;compute suitble x so the winner statment is centered
+    add al,P1Name[1] ;al=lenght of statment (winner playername + 'Wins')
+    mov ah,0
+    mov dl,2
+    div dl ;divide lenght by 2
+    sub CursorPositionX,al
+    Call MoveCursor
+    
+    mov ah, 9
+    mov dx, offset P1Name[2]
+    int 21h
+    jmp PRINTWINS
+    CheckifPlayer2dead1:
+    ;Print Player1 name as a winner if player2health = 0
+    cmp PlayersHealth+1,0 
+    ;compute suitble x so the winner statment is centered
+    add al,P2Name[1] ;al=lenght of statment (winner playername + 'Wins')
+    mov ah,0
+    mov dl,2
+    div dl
+    sub CursorPositionX,al
+    Call MoveCursor
+    
+    mov ah, 9
+    mov dx, offset P2Name[2]
+    int 21h
+    
     PRINTWINS:
-    ;Print 'WINS'
     mov ah, 9
     mov dx, offset WINNERPLAYER
     int 21h
@@ -509,15 +632,13 @@ PRINTWINNER PROC
 PRINTWINNER ENDP
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-ASK_P1 PROC  ;ASK PLAYER 1 FOR THEIR NAME
+ASK_P PROC  ;ASK PLAYER 1 FOR HIS/HER NAME
     
-    mov cl,'1'            
-    mov A_P[15],cl
     ASK1:
     ;FILL NAME OF PLAYER  WITH $    
     MOV AX,DS
     MOV ES,AX 
-    MOV CX, 17 
+    MOV CX, 17
     MOV SI,OFFSET EMPTYSTR 
     MOV DI, OFFSET P1NAME+2
     REP MOVSB   
@@ -530,8 +651,8 @@ ASK_P1 PROC  ;ASK PLAYER 1 FOR THEIR NAME
     MOV DH, 12 ;ROW
     INT 10H      
     ; displaying first player message 
-    MOV AH, 09 
-    MOV DX , Offset A_P 
+    MOV AH,09 
+    MOV DX ,Offset A_P 
     INT 21H   
     ;input first player name
     MOV AH, 0AH 
@@ -551,7 +672,7 @@ ASK_P1 PROC  ;ASK PLAYER 1 FOR THEIR NAME
     INVALID:
     call CLEAR_TEXT 
     MOV AH, 09 
-    MOV DX , Offset ERROR 
+    MOV DX ,Offset ERROR 
     INT 21H 
     ;WAIT FOR PLAYER TO PRESS ENTER
     PRESSENTER:
@@ -562,69 +683,16 @@ ASK_P1 PROC  ;ASK PLAYER 1 FOR THEIR NAME
     ;TAKE INPUT AGAIN     
     JMP ASK1 
     ;IF VALID MOVE ON
-    VALID:
+    VALID:  
+    call clear_text
 
     
     RET
-ASK_P1 ENDP  
+ASK_P ENDP  
  
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
-ASK_P2 PROC     ; ASK PLAYER 2 FOR THEIR NAME 
-                
-    mov cl,'2'            
-    mov A_P[15],cl
-    
-    ASK2:   
-    MOV AX,DS
-    MOV ES,AX 
-    MOV CX, 17 
-    MOV SI,OFFSET EMPTYSTR 
-    MOV DI, OFFSET P2NAME+2
-    REP MOVSB
-    call CLEAR_TEXT
-    MOV AH, 02 
-    MOV BH, 00 
-    MOV DL, 6 ;COL 
-    MOV DH, 12 ;ROW
-    INT 10H      
-    ; displaying SECOND player message 
-    MOV AH, 09 
-    MOV DX , Offset A_P 
-    INT 21H   
-    ;input SECOND player name
-    MOV AH, 0AH 
-    MOV DX, Offset P2NAME 
-    INT 21H
-    ;CHECK SECOND LETTER
-    CMP P2NAME+2 , 'Z'
-    JL CAPITAL2 
-    SUB P2NAME[2],32
-    CAPITAL2:
-    CMP P2NAME[2], 'A'
-    JB INVALID2
-    CMP P2NAME[2], 'Z'
-    JA INVALID2 
-    JMP VALID2
-    INVALID2:
-    call CLEAR_TEXT 
-    MOV AH, 09 
-    MOV DX , Offset ERROR 
-    INT 21H 
-    PRESSENTER2:
-    MOV AH, 00 ; AL: ASCII Code, AH: Scancode
-    INT 16H  
-    CMP AH ,1CH
-    JNZ PRESSENTER2 
-    
-    JMP ASK2 
-    
-    VALID2:
-    call CLEAR_TEXT 
-    RET
-ASK_P2 ENDP
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-CLEAR_TEXT PROC
+CLEAR_TEXT PROC   ; H4ELHA W AB3T LL MACRO ISA 
+    
     ; MOVE CURSOR TO SPECIFIC POSITION
     MOV AH, 0CH
     MOV CX, 0 ; X coordinate
@@ -644,7 +712,7 @@ CLEAR_TEXT PROC
     
     MOV CX,0
     INC DX
-    CMP DX, 120
+    CMP DX, 200
     JNZ LOOPROFL
     
     
@@ -721,6 +789,8 @@ MainBar PROC
     ;;;;Print Players names;;;;
     ;;;;;;;;;;Player1;;;;;;;;;;
     ;Place '$' at the end of the Name
+    cmp mynum,0
+    jne play2
     mov ch,0
     mov bx,offset P1Name
     mov cl,P1Name[1]
@@ -770,11 +840,60 @@ MainBar PROC
     ;Print Player2 Name in new cursor position
     mov ah, 9
     mov dx, offset P2Name[2]
-    int 21h  
+    int 21h 
+    jmp fini 
+    play2:
+    mov ch,0
+    mov bx,offset P2Name
+    mov cl,P2Name[1]
+    add cl,2
+    add bx,cx 
+    mov [bx],'$'
+    ;Place '$' at the end of display limit 
+    mov cx,14
+    mov bx,offset P2Name
+    add bx,cx
+    mov [bx],'$'
     
-    ;UPDATE REEM
-    CALL DRAW_CLOUDS
-      
+    mov CursorPositionX,2
+    mov CursorPositionY,3
+    
+    Call MoveCursor
+    ;Print Player1 Name in new cursor position
+    mov ah, 9
+    mov dx, offset P2Name[2]
+    int 21h   
+    ;;;;;;;;;;Player2;;;;;;;;;;              
+    ;Place '$' at the end of display limit
+    mov cx,14
+    mov bx,offset P1Name
+    add bx,cx
+    mov [bx],'$'
+    ;Place '$' at the end of the Name
+    mov ch,0
+    mov bx,offset P1Name
+    mov cl,P1Name[1]
+    add cl,2 
+    add bx,cx
+    mov [bx],'$'
+    
+    mov CursorPositionY,3
+    mov CursorPositionX,40
+    
+    cmp cl,12
+    JB LONGNAME1
+    sub CursorPositionX,14 ;if the playername > limit --> move cursor to the right position
+    JMP PRINTPLAYER1NAME
+    LONGNAME1:
+    sub CursorPositionX,cl
+    PRINTPLAYER1NAME: 
+    Call MoveCursor
+    
+    ;Print Player2 Name in new cursor position
+    mov ah, 9
+    mov dx, offset P1Name[2]
+    int 21h 
+    fini:   
     ret
 MainBar endp 
 
@@ -1593,7 +1712,9 @@ DRAWPROJ PROC
     CMP AL,COLOR1 ;WHEEL COLOR
     JE COLLISION 
     CMP AL,MountainColor ;THEEEEEEE OBSTAACCCLLLEEE
-    JE COLLISION
+    JE COLLISION 
+    CMP  al,0fh
+    je collision
     JMP MOVON1
     
     COLLISION:
@@ -1823,27 +1944,839 @@ DISPLAY_SOUND ENDP
 
 
 
-
 DRAW_CLOUDS PROC 
   
   PUSHA
-  MOV X1,20
-  Mov Y1,50 
+  push r  
+  MOV AX, CLX1
+  MOV X1,AX
+  MOV AX, CLY
+  Mov Y1,AX
   PUSH X1
   PUSH Y1
-  MOV DRAWINGCOLOR,1  
-  mov r,5  
-   PUSH R
+  mov r,15  
+  PUSH R
+ ; MOV L1,30
+  CALL Drawlcircle
+  POP R 
+  
+  POP Y1
+  POP X1 
+  PUSH X1
+  CALL Drawucircle     
+  POP X1
+  
+  
+  ADD X1,13
+  Mov Y1,70 
+  PUSH X1
+  PUSH Y1 
+  mov r,15  
+  PUSH R
  ; MOV L1,30
   CALL Drawlcircle
   POP R 
   
   POP Y1
   POP X1
+  
+  PUSH X1
+  PUSH Y1
+  push r
+  CALL Drawucircle  
+  pop r
+  pop y1
+  pop x1
+  
+  
+  ADD X1,13
+  Mov Y1,70 
+  PUSH X1
+  PUSH Y1 
+  mov r,15  
+  PUSH R
+ ; MOV L1,30
+  CALL Drawlcircle
+  POP R 
+  
+  POP Y1
+  POP X1
+  
+  CALL Drawucircle
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  
+  MOV AX, CLX2
+  MOV X1,AX
+  MOV AX, CLY
+  Mov Y1,AX
+  PUSH X1
+  PUSH Y1
+  mov r,15  
+  PUSH R
+ ; MOV L1,30
+  CALL Drawlcircle
+  POP R 
+  
+  POP Y1
+  POP X1 
+  PUSH X1
   CALL Drawucircle     
-    
-    
+  POP X1
+  
+  
+  ADD X1,13
+  Mov Y1,70 
+  PUSH X1
+  PUSH Y1 
+  mov r,15  
+  PUSH R
+ ; MOV L1,30
+  CALL Drawlcircle
+  POP R 
+  
+  POP Y1
+  POP X1
+  
+  PUSH X1
+  PUSH Y1
+  push r
+  CALL Drawucircle  
+  pop r
+  pop y1
+  pop x1
+  
+  
+  ADD X1,13
+  Mov Y1,70 
+  PUSH X1
+  PUSH Y1 
+  mov r,15  
+  PUSH R
+ ; MOV L1,30
+  CALL Drawlcircle
+  POP R 
+  
+  POP Y1
+  POP X1
+  
+  CALL Drawucircle
+  
+  
+  
+  pop r 
   POPA  
     RET 
-DRAW_CLOUDS ENDP    
+DRAW_CLOUDS ENDP  
+
+
+MOV_CLOUDS PROC 
+    PUSHA 
     
+    DEC MOVEDELAY   
+    MOV CX,0
+    CMP MOVEDELAY,CX
+    JNE DRAAWCLOUDD
+    MOV CX,MOVEDELAYTIME
+    MOV MOVEDELAY,CX
+    
+    MOV CL,BACKGROUNDCOLOR
+    MOV DRAWINGCOLOR, CL  
+    CALL DRAW_CLOUDS    
+    
+    MOV AX,CLX1
+    CMP AX,250
+    JNE CHECKMOSTLEFT 
+    ;CLX1=250           
+    MOV CX,1
+    MOV MOVEDIRECTION1,CX 
+    MOV MOVEDIRECTION2,CX
+    JMP STARTDRAWCLOUDD
+    CHECKMOSTLEFT:
+    ;CLX1 != 300
+    CMP AX,20
+    JNE STARTDRAWCLOUDD
+    ;AX=20    
+    MOV CX,0
+    MOV MOVEDIRECTION1,CX
+    MOV MOVEDIRECTION2,CX
+    STARTDRAWCLOUDD:
+    CMP MOVEDIRECTION1,0
+    JNE MOVECLOUDLEFT
+    ;DIRECTION = 0 (RIGHT)
+    INC CLX1 
+    DEC CLX2
+    JMP DRAAWCLOUDD
+    MOVECLOUDLEFT:
+    ;DIRECTION = 1 (LEFT)
+    DEC CLX1  
+    INC CLX2
+    
+    
+    DRAAWCLOUDD:
+    MOV DRAWINGCOLOR,0FH
+    CALL DRAW_CLOUDS
+    
+    POPA
+    RET
+    MOV_CLOUDS ENDP
+    
+SELECTLEVEL PROC
+    ;Fill Background with Background Color
+    MOV AH, 06h    ; Scroll up function
+    XOR AL, AL     ; Clear entire screen
+    MOV CX, 500h  ; Upper left corner CH=row, CL=column 
+    MOV DX, 124FH  ; lower right corner DH=row, DL=column 
+    MOV BH, 0
+    INT 10H     
+    
+    mov CursorPositionX,17
+    mov CursorPositionY,13
+    Call MoveCursor
+    ;Change in string based on current level number
+    mov al,1 
+    add al,30h
+    mov Level+6,al
+    ;Print Level at new Cursor position
+    mov ah, 9
+    mov dx, offset Level
+    int 21h 
+    
+    
+    mov CursorPositionX,17
+    mov CursorPositionY,15
+    Call MoveCursor
+    ;Change in string based on current level number
+    mov al,2 
+    add al,30h
+    mov Level+6,al
+    ;Print Level at new Cursor position
+    mov ah, 9
+    mov dx, offset Level
+    int 21h  
+ 
+    
+    MOV CL,1      
+    MOV LEVELNUMBER,CL
+    CALL CHANGEARROWPOSITION
+    
+    WAITFORSELECTLEVEL: 
+        ; this is used as if player  press by wrong button (during projectile movement)
+    ;EMPTY THE BUFFER 
+    MOV AL,0 
+    mov ah,0Ch              
+    int 21h 
+    
+    MOV AH, 00 
+    INT 16H  
+    
+    MOV BL,0
+    CMP MYNUM,BL
+    JNE WAITFORSELECTLEVEL
+    CMP AL,13
+    JE ENDSELECTINGLEVEL   
+    CMP AH,UP
+    JNE WAITFORSELECTLEVEL
+    ;PLAYER1 PRESSED UP KEY 
+    MOV DL,1
+    CMP LEVELNUMBER,DL
+    JNE SWITCHUPTOLEVEL2 
+    MOV DL,2
+    MOV LEVELNUMBER,DL
+    JMP CHANGEARROWPOSITION
+    SWITCHUPTOLEVEL2:
+    MOV DL,1
+    MOV LEVELNUMBER,DL
+    JMP CHANGEARROWPOSITION  
+    
+    CHANGEARROWPOSITION:  
+    MOV DL,1
+    CMP LEVELNUMBER,DL
+    JNE LEVELTWOISNOWSELECTED
+    
+    mov CursorPositionX,15
+    mov CursorPositionY,13
+    Call MoveCursor  
+    
+        ;Print Heart after health Number
+        mov ah, 0eh           ;0eh = 14
+        mov al,16
+        xor bx, bx            ;Page number zero
+        mov bl, 0ch           ;Color is red
+        int 10h  
+        
+    mov CursorPositionX,15
+    mov CursorPositionY,15
+    Call MoveCursor    
+        
+            
+        mov ah, 0eh           ;0eh = 14
+        mov al,16
+        xor bx, bx            ;Page number zero
+        mov bl, 0           ;Color is red
+        int 10h  
+        
+     JMP WAITFORSELECTLEVEL   
+   LEVELTWOISNOWSELECTED:
+     
+    mov CursorPositionX,15
+    mov CursorPositionY,13
+    Call MoveCursor  
+    
+       ;Print Heart after health Number
+        mov ah, 0eh           ;0eh = 14
+        mov al,16
+        xor bx, bx            ;Page number zero
+        mov bl, 0           ;Color is red
+        int 10h  
+        
+    mov CursorPositionX,15
+    mov CursorPositionY,15
+    Call MoveCursor    
+        
+            
+        mov ah, 0eh           ;0eh = 14
+        mov al,16
+        xor bx, bx            ;Page number zero
+        mov bl, 0CH           ;Color is red
+        int 10h  
+     
+     JMP WAITFORSELECTLEVEL
+        
+      
+    ENDSELECTINGLEVEL:
+      
+RET
+SELECTLEVEL ENDP    
+    
+
+                 
+                 
+MANAGER PROC                
+     START_AGAIN1:
+       mov CursorPositionX,1
+    mov CursorPositionY,23
+    
+    Call MoveCursor
+     
+    MOV AH, 01 ; ZF =0 if key pressed, else ZF=1
+    INT 16H  
+    JZ PRINTNULL1
+    
+    MOV AH, 00 ; AL: ASCII Code, AH: Scancode
+    INT 16H 
+    
+    JMP R1
+    PRINTNULL1:
+    MOV AX,0
+    R1:
+    PUSH AX 
+    
+             
+        mov dx , 3FDH
+        MOV CX,1		; Line Status Register
+ AGAIN1:  
+         INC CX
+  CMP CX,50000 
+  JE NOCON1
+        In al , dx 			;Read Line Status
+        AND al , 00100000b   
+        
+        JZ AGAIN1
+        
+         
+        mov dx , 3F8H		; Transmit data register
+        POP AX 
+        MOV AL,AH
+  		out dx , aL   
+  		
+  		CMP ah, cf2
+  		jne con1 
+  		CMP MYNUM,2
+  		JE STARTG
+  		MOV MYNUM,0 
+  		MOV OTHNUM, 2 
+  		
+  
+  		 
+      delete_screen 23,25  
+        MOV AH,9
+        MOV DX,OFFSET INV
+        INT 21H
+  		
+  	    MOV AH,9	
+	    MOV DX,OFFSET P2NAME[2]
+        INT 21H 
+  		
+        con1: 
+        CMP ah, cf1
+  		jne con2 
+  		CMP PF1,1
+  		JE STARTC
+  		MOV PF1,2
+  		
+  
+        MOV AH,9H
+        MOV DX,OFFSET INV1 ;INVITATION TO CHAT
+        INT 21H
+  		
+  	    MOV AH,9H	
+	    MOV DX,OFFSET P2NAME[2]
+        INT 21H 
+        
+        
+        
+        
+        CON2:             
+        mov dx , 3FDH		; Line Status Register     
+        MOV CX,1
+  CHK1:  
+  INC CX
+  CMP CX,50000
+  JE NOCON1
+   in al , dx 
+        AND al , 1 
+       JZ CHK1
+
+        mov dx , 03F8H
+        in al , dx  
+        CMP AL,CF2 
+        jne con11 
+  		CMP MYNUM,0
+  		JE STARTG
+  		MOV MYNUM,2 
+  		MOV OTHNUM ,0
+  		
+  		
+       MOV AH,9	
+	   MOV DX,OFFSET P2NAME[2]
+       INT 21H 
+        
+        MOV AH,9
+        MOV DX,OFFSET RINV
+        INT 21H 
+        
+        CON11: 
+        CMP AL,CF1 
+        jne con12 
+  		CMP PF1,2
+  		JE STARTC
+  		MOV PF1,1
+  		
+  		
+       MOV AH,9H	
+	   MOV DX,OFFSET P2NAME[2]
+       INT 21H 
+        
+        MOV AH,9H
+        MOV DX,OFFSET RINV1
+        INT 21H 
+        
+         
+       con12:  
+         
+         ;CALL CONNECTION_CHECK
+    JMP START_AGAIN1
+      
+             
+    NOCON1:      
+    ;MOV AH,9H
+;    MOV DX,OFFSET CONNECTIONERROR
+;    INT 21H 
+    ;CALL CONNECTION_CHECK       
+     JMP START_AGAIN1  
+     
+STARTC:
+ MOV MODE,1
+ MOV AH,cf1
+JMP H  
+STARTG: 
+;       ;START GAME 
+;        MOV AH,9H
+;        MOV DX,OFFSET START
+;        INT 21H 
+;        
+       MOV AH,cf2 
+
+H:       
+   
+      delete_screen 23,25  
+            
+    RET
+    MANAGER ENDP
+
+
+CONFIGURE PROC 
+    
+    mov dx,3fbh 			; Line Control Register
+    mov al,10000000b		;Set Divisor Latch Access Bit
+    out dx,al				;Out it
+    
+    mov dx,3f8h			
+    mov al,0ch			
+    out dx,al
+    
+    mov dx,3f9h
+    mov al,00h
+    out dx,al
+    
+    mov dx,3fbh
+    mov al,00011011b
+    ;0Access to Receiver buffer, Transmitter buffer
+    ;0:Set Break disabled
+    ;011:Even Parity
+    ;0:One Stop Bit
+    ;11:8bits
+    out dx,al
+    
+       
+    RET
+    CONFIGURE ENDP    
+
+CONNECTION_CHECK PROC
+    
+    
+ START_AGAINR:   
+              
+        mov dx , 3FDH		; Line Status Register
+ AGAINR:  In al , dx 			;Read Line Status
+        AND al , 00100000b   
+        
+        JZ AGAINR
+        
+         
+        mov dx , 3F8H		; Transmit data register
+        MOV AL, 'R'
+  		out dx , al 
+                       
+        mov dx , 3FDH		; Line Status Register
+   CHKR: 
+   in al , dx 
+        AND al , 1
+        JZ CHKR
+       
+        
+        mov dx , 03F8H
+        in al , dx  
+        mov dl,AL
+        CMP AL,'R'              
+       JNE START_AGAINR 
+     ;  MOV AH, 02 ; Output Char
+;    MOV DL,AL ; Char to Display
+;    INT 21H
+        
+        
+         
+ START_AGAINM:       
+        mov dx , 3FDH		; Line Status Register
+ AGAINM:  In al , dx 			;Read Line Status
+        AND al , 00100000b
+        JZ AGAINM
+        
+        mov dx , 3F8H		; Transmit data register
+        MOV AL, 'M'
+  		out dx , al      
+  
+  		
+  		 mov dx , 3FDH		; Line Status Register
+   CHKM: in al , dx 
+        AND al , 1
+        JZ CHKM
+        
+        
+        mov dx , 03F8H
+        in al , dx 
+        CMP AL,'M'              
+      JNE START_AGAINM 
+        ;  MOV AH, 02 ; Output Char
+; 
+;        MOV DL,AL
+;        INT 21H   
+  		
+                    
+                   RET
+     CONNECTION_CHECK ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+SENDNAME PROC
+    
+   mov bx,0
+START_AGAINP:
+    MOV DX,3FDH
+  AGAINP:
+    IN AL,DX
+    AND AL,00100000B
+    JZ AGAINP
+    
+    MOV DX,3F8H
+    MOV AL,P1NAME[BX]
+    OUT DX,AL   
+    CALL RECIEVENAME 
+  
+    INC BX
+    CMP BX,16
+    JNE START_AGAINP
+             
+      RET        
+SENDNAME ENDP
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+RECIEVENAME PROC 
+  MOV DX,3FDH
+  CHKP:
+     IN AL,DX
+     AND AL,1
+     JZ CHKP
+  
+  MOV DX,03F8H
+  IN AL,DX
+  MOV P2NAME[BX],AL
+
+ RET  
+RECIEVENAME ENDP    
+
+CHAT PROC 
+    MOV CL,0
+    MOV CH,0 
+    MOV CursorPositionX,CL
+    MOV CursorPositionY,CH 
+    call movecursor 
+    
+    MOV AH,2
+    MOV DX,':'
+    INT 21H 
+    
+    MOV AH,9H
+    MOV DX,OFFSET P1NAME[2] 
+    INT 21H  
+    
+    
+     
+  ;  MOV AH,9H
+;    MOV DX,OFFSET COLMN 
+;    INT 21H 
+    MOV CL,0
+    MOV CH,12 
+    MOV CursorPositionX,CL
+    MOV CursorPositionY,CH 
+    call movecursor 
+    
+    MOV AH,9H
+    MOV DX,OFFSET P2NAME[2] 
+    INT 21H  
+     
+         PUSH L1
+    ; SET POSITION TO DRAW BELLOW LINE
+    MOV X1,5
+    MOV Y1,181 
+    MOV L1,300
+    MOV DRAWINGCOLOR,0DH      
+    CALL DRAWHLINE 
+    ; SET CURSOR POSTION TO DISPLAY MESSAGE 
+    
+    mov CursorPositionX,1
+    mov CursorPositionY,23
+    
+    Call MoveCursor
+    
+
+    ; DIPLAYING ESCAPE MESSAGE
+    MOV AH ,9H
+    MOV DX,OFFSET F3MESSAGE
+    INT 21H
+    
+    POP L1  
+    
+
+    
+
+      
+    ;MOV AH,9H
+;    MOV DX,OFFSET COLMN 
+;    INT 21H
+     
+   
+  
+
+    
+   
+ CHATLOOP:   
+     MOV AH, 01 ; ZF =0 if key pressed, else ZF=1
+    INT 16H  
+    JZ PRINTNULL
+    
+    MOV AH, 00 ; AL: ASCII Code, AH: Scancode
+    INT 16H   
+     JMP L
+    PRINTNULL:
+    MOV AL,0
+    L:
+    PUSH AX
+    
+    CMP YPOS,12
+    JL CONTINUE
+    DELETE_SCREEN 1,11
+    MOV XPOS,0
+    MOV YPOS,1
+    CONTINUE: 
+    MOV CL,XPOS
+    MOV CH,YPOS 
+    MOV CursorPositionX,CL
+    MOV CursorPositionY,CH
+    CALL MOVECURSOR 
+   ; print my wordes (sending characters)
+   CMP AL,0
+   JE NOPRINT
+    MOV AH, 02 ; Output Char
+    MOV DL,AL ; Char to Display
+    INT 21H        
+    
+    CALL GETCURSOR
+    MOV XPOS,DL
+    MOV YPOS,DH  
+    
+    NOPRINT:
+     
+    POP AX	
+    CMP AH,61
+    JNE AJUMP
+      MOV AL,15   ; FR HANDELING A USER GOING BACK TO MENUE
+     AJUMP: 
+     PUSH AX     
+    mov dx , 3FDH		; Line Status Register
+    AGAINPP: 
+    In al , dx 			;Read Line Status
+    AND al , 00100000b
+    JZ AGAINPP 
+
+     
+    mov dx , 3F8H
+    POP AX		; Transmit data register
+    out dx , al 
+     
+    CMP AL,15
+    JE ENDCHAT  
+        
+   CHECKINP:  
+     mov dx , 3FDH		; Line Status Register
+   CHKPP: in al , dx 
+        AND al , 1
+        JZ CHKPP
+    
+        
+    mov dx , 03F8H
+    in al , dx 
+    CMP AL,15
+    JE ENDCHAT  
+    
+    CMP AL,0
+    JE CHATLOOP
+    ; CHECKING BOUNDARY OF RECIEVING AREA
+    
+    MOV CL,XRPOS
+    MOV CH,YRPOS
+    CMP YRPOS,23
+    JL CONTINUE2
+    DELETE_SCREEN 13,23
+    MOV XRPOS,0
+    MOV YRPOS,13
+    CONTINUE2:
+    MOV CL,XRPOS
+    MOV CH,YRPOS
+   MOV CursorPositionX,CL
+   MOV CursorPositionY,CH
+    
+    CALL MOVECURSOR
+    MOV AH, 02 ; Output Char , 7 :Bell SOud
+    MOV DL ,AL ; Char to Display
+    INT 21H 
+    CALL GETCURSOR
+    MOV XRPOS,DL
+    MOV YRPOS,dh
+    JMP CHATLOOP
+
+    ENDCHAT:
+ 
+    RET
+    CHAT ENDP 
+     
+GETCURSOR PROC
+   MOV AH,3H
+   MOV BH,0H
+   INT 10H 
+    RET
+GETCURSOR ENDP 
+
+INNERCHAT PROC    
+    Mov cl,myx
+    mov ch, myy
+     mov CursorPositionx,cl
+    mov CursorPositiony,ch
+    CALL MOVECURSOR 
+    cmp myinp,'a'
+    jae Print1
+    cmp myinp, 32
+    jne no      
+    Print1:
+    MOV AH, 02 ; Output Char , 7 :Bell SOud
+    MOV DL ,myinp ; Char to Display
+    INT 21H 
+    CALL GETCURSOR
+    MOV myx,DL
+    MOV myy,dh 
+    CMP MYX,39
+    JNE NO
+    DELETE_SCREEN 20,20
+    MOV CURSORPOSITIONX,0
+    MOV CURSORPOSITIONY,20
+    CALL MOVECURSOR 
+    
+    MOV AH,2
+    MOV Dl,P2NAME[2]
+    INT 21H 
+    
+       
+    MOV AH,2
+    MOV DX,':'
+    INT 21H 
+    
+    MOV myx,2
+    MOV myy,20
+    no: 
+     mov cl,ux
+    mov ch, uy
+     mov CursorPositionx,cl
+    mov CursorPositiony,ch
+    CALL MOVECURSOR 
+    cmp userinp,'a'
+    jae Print2
+    cmp userinp, 32
+    jne no2 
+   Print2:
+    MOV AH, 02 ; Output Char , 7 :Bell SOud
+    MOV DL ,userinp ; Char to Display
+    INT 21H 
+    CALL GETCURSOR
+    MOV ux,DL
+    MOV uy,dh 
+    CMP UX,39
+    JNE NO2
+  DELETE_SCREEN 20,20
+    MOV CURSORPOSITIONX,0
+    MOV CURSORPOSITIONY,21
+    CALL MOVECURSOR 
+    
+    MOV AH,2
+    MOV Dl,P1NAME[2]
+    INT 21H 
+    
+     MOV AH,2
+    MOV DX,':'
+    INT 21H 
+    MOV Ux,2
+    MOV Uy,21
+    no2:
+    
+    
+    RET
+    INNERCHAT ENDP
+
